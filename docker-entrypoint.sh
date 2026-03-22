@@ -9,15 +9,31 @@ ufw_docker_agent_image="${ufw_docker_agent_image:-chaifeng/${ufw_docker_agent}:1
 function ufw-allow-or-deny-service() {
     declare id="$1"
     declare port="$2"
+    declare from_source="${3:-}"
+    declare is_deny=false
 
-    if [[ "$port" = deny || "$port" = */deny ]]; then
-        port="${port%deny}"
-        port="${port%/}"
+    if [[ "$port" = deny ]]; then
+        is_deny=true
+        port=""
+    elif [[ "$port" = */deny ]]; then
+        is_deny=true
+        port="${port%/deny}"
+    fi
+
+    if [[ "$port" = *"|"* ]]; then
+        from_source="${port#*|}"
+        port="${port%%|*}"
+    fi
+
+    if "$is_deny"; then
         declare -a opts=("$id")
         [[ -z "$port" ]] || opts+=("$port")
+        [[ -z "$from_source" ]] || opts+=(--from "$from_source")
         run-ufw-docker delete allow "${opts[@]}"
     else
-        run-ufw-docker add-service-rule "$id" "$port"
+        declare -a opts=("$id" "$port")
+        [[ -z "$from_source" ]] || opts+=("$from_source")
+        run-ufw-docker add-service-rule "${opts[@]}"
     fi
 }
 

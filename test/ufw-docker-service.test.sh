@@ -81,7 +81,17 @@ test-service-allow-succeeds-with-service-and-port() {
     ufw-docker--service allow webapp 80/tcp
 }
 test-service-allow-succeeds-with-service-and-port-assert() {
-    ufw-docker--service-allow webapp 80/tcp
+    ufw-docker--service-allow webapp 80/tcp ""
+}
+
+
+test-service-allow-succeeds-with-service-port-and-source() {
+    load-ufw-docker-function ufw-docker--service
+
+    ufw-docker--service allow webapp 80/tcp --from 203.0.113.10/32
+}
+test-service-allow-succeeds-with-service-port-and-source-assert() {
+    ufw-docker--service-allow webapp 80/tcp 203.0.113.10/32
 }
 
 
@@ -113,7 +123,7 @@ test-service-delete-allow-succeeds-with-service-name() {
     ufw-docker--service delete allow webapp
 }
 test-service-delete-allow-succeeds-with-service-name-assert() {
-    ufw-docker--service-delete webapp
+    ufw-docker--service-delete webapp "" ""
 }
 
 
@@ -123,7 +133,7 @@ test-service-delete-allow-succeeds-with-service-name-and-port-protocol() {
     ufw-docker--service delete allow webapp 8080/tcp
 }
 test-service-delete-allow-succeeds-with-service-name-and-port-protocol-assert() {
-    ufw-docker--service-delete webapp 8080/tcp
+    ufw-docker--service-delete webapp 8080/tcp ""
 }
 
 
@@ -133,7 +143,17 @@ test-service-delete-allow-succeeds-with-service-name-and-port() {
     ufw-docker--service delete allow webapp 8080
 }
 test-service-delete-allow-succeeds-with-service-name-and-port-assert() {
-    ufw-docker--service-delete webapp 8080
+    ufw-docker--service-delete webapp 8080 ""
+}
+
+
+test-service-delete-allow-succeeds-with-service-name-port-and-source() {
+    load-ufw-docker-function ufw-docker--service
+
+    ufw-docker--service delete allow webapp 8080 --from 203.0.113.10/32
+}
+test-service-delete-allow-succeeds-with-service-name-port-and-source-assert() {
+    ufw-docker--service-delete webapp 8080 203.0.113.10/32
 }
 
 
@@ -207,6 +227,26 @@ test-service-allow-requires-service-name-a-service-while-agent-not-running-asser
            --env ufw_docker_agent_image="chaifeng/ufw-docker-agent:090502" \
            --env DEBUG="false" \
            --env "ufw_public_abcd1234=webapp/80/tcp" \
+           "chaifeng/ufw-docker-agent:090502"
+}
+
+
+test-service-allow-requires-service-name-a-service-while-agent-not-running-with-source() {
+    @mock ufw-docker--get-service-id webapp === @stdout abcd1234
+    @mock ufw-docker--get-service-name webapp === @stdout webapp
+    @mock ufw-docker--list-service-ports webapp === @stdout "53 53/udp" "80 80/tcp" "8080 8080/tcp"
+    @mockfalse docker service inspect ufw-docker-agent
+
+    load-ufw-docker-function ufw-docker--service-allow
+    ufw-docker--service-allow webapp 80/tcp 203.0.113.10/32
+}
+test-service-allow-requires-service-name-a-service-while-agent-not-running-with-source-assert() {
+    docker service create --name ufw-docker-agent --mode global \
+           --mount type=bind,source=/var/run/docker.sock,target=/var/run/docker.sock \
+           --mount type=bind,source=/etc/ufw,target=/etc/ufw,readonly=true \
+           --env ufw_docker_agent_image="chaifeng/ufw-docker-agent:090502" \
+           --env DEBUG="false" \
+           --env "ufw_public_abcd1234=webapp/80/tcp|203.0.113.10/32" \
            "chaifeng/ufw-docker-agent:090502"
 }
 
@@ -431,6 +471,27 @@ test-service-delete-specific-port-for-service-from-multiple-rules-assert() {
 }
 
 
+test-service-delete-specific-port-for-service-and-source() {
+    mock-abcd1234-webapp
+    @mock ufw-docker--get-env-list === @stdout \
+        "xxx 888/tcp" \
+        "abcd1234 webapp/80/tcp|203.0.113.10/32" \
+        "abcd1234 webapp/80/tcp|198.51.100.8/32" \
+        "abcd1234 webapp/53/udp"
+
+    load-ufw-docker-function ufw-docker--service-delete
+    ufw-docker--service-delete webapp 8080 203.0.113.10/32
+}
+test-service-delete-specific-port-for-service-and-source-assert() {
+    docker service update --update-parallelism=0 \
+           --env-add ufw_docker_agent_image="${ufw_docker_agent_image}" \
+           --env-add "ufw_public_abcd1234=webapp/80/tcp|203.0.113.10/32/deny,webapp/80/tcp|198.51.100.8/32,webapp/53/udp" \
+           --env-add "DEBUG=false" \
+           --image "${ufw_docker_agent_image}" \
+           "${ufw_docker_agent}"
+}
+
+
 test-service-delete-adds-deny-rule-for-port-without-previous-rule() {
     mock-abcd1234-webapp
     @mock ufw-docker--get-env-list === @stdout "xxx 888/tcp" "abcd1234 webapp/53/tcp"
@@ -559,4 +620,25 @@ test-docker-entrypoint-updates-ufw-rules-with-deny-first-assert() {
     docker "${docker_opts[@]}" delete allow id222222
     docker "${docker_opts[@]}" delete allow id333333 8080/tcp
     docker "${docker_opts[@]}" add-service-rule id333333 5353/udp
+}
+
+test-docker-entrypoint-updates-ufw-rules-with-source() {
+    setup-mock-for-testing-docker-entrypoint
+    declare -x ufw_public_id444444=delta/8080/tcp\|203.0.113.10/32,delta/9090/tcp\|203.0.113.10/32/deny
+
+    @run "$working_dir"/../docker-entrypoint.sh update-ufw-rules
+}
+test-docker-entrypoint-updates-ufw-rules-with-source-assert() {
+    declare -a docker_opts=(run --rm -t --name ufw-docker-agent-42-200902140731
+                            --cap-add NET_ADMIN --network host --env DEBUG=false
+                            -v /var/run/docker.sock:/var/run/docker.sock
+                            -v /etc/ufw:/etc/ufw
+                            chaifeng/ufw-docker-agent:090502
+                           )
+    docker "${docker_opts[@]}" add-service-rule id111111 80/tcp
+    docker "${docker_opts[@]}" delete allow id222222
+    docker "${docker_opts[@]}" delete allow id333333 8080/tcp
+    docker "${docker_opts[@]}" add-service-rule id333333 5353/udp
+    docker "${docker_opts[@]}" delete allow id444444 9090/tcp --from 203.0.113.10/32
+    docker "${docker_opts[@]}" add-service-rule id444444 8080/tcp 203.0.113.10/32
 }

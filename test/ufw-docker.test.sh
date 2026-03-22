@@ -223,7 +223,7 @@ test-list-command-for-instance() {
     ufw-docker list httpd
 }
 test-list-command-for-instance-assert() {
-    ufw-docker--list httpd-container-name "" tcp ""
+    ufw-docker--list httpd-container-name "" tcp "" ""
 }
 
 
@@ -232,7 +232,7 @@ test-allow-command-for-instance() {
     ufw-docker allow httpd
 }
 test-allow-command-for-instance-assert() {
-    ufw-docker--allow httpd-container-name "" tcp ""
+    ufw-docker--allow httpd-container-name "" tcp "" ""
 }
 
 
@@ -241,7 +241,7 @@ test-allow-command-for-instance-with-port() {
     ufw-docker allow httpd 80
 }
 test-allow-command-for-instance-with-port-assert() {
-    ufw-docker--allow httpd-container-name 80 tcp ""
+    ufw-docker--allow httpd-container-name 80 tcp "" ""
 }
 
 
@@ -250,7 +250,7 @@ test-allow-command-for-instance-with-port-and-tcp-protocol() {
     ufw-docker allow httpd 80/tcp
 }
 test-allow-command-for-instance-with-port-and-tcp-protocol-assert() {
-    ufw-docker--allow httpd-container-name 80 tcp ""
+    ufw-docker--allow httpd-container-name 80 tcp "" ""
 }
 
 
@@ -259,7 +259,16 @@ test-allow-command-for-instance-with-port-and-udp-protocol() {
     ufw-docker allow httpd 80/udp
 }
 test-allow-command-for-instance-with-port-and-udp-protocol-assert() {
-    ufw-docker--allow httpd-container-name 80 udp ""
+    ufw-docker--allow httpd-container-name 80 udp "" ""
+}
+
+
+test-allow-command-for-instance-with-source() {
+    @mock ufw-docker--instance-name httpd === @stdout httpd-container-name
+    ufw-docker allow httpd 80/tcp --from 203.0.113.10/32
+}
+test-allow-command-for-instance-with-source-assert() {
+    ufw-docker--allow httpd-container-name 80 tcp "" 203.0.113.10/32
 }
 
 
@@ -276,7 +285,7 @@ test-delete-allow-command-for-instance() {
     ufw-docker delete allow httpd
 }
 test-delete-allow-command-for-instance-assert() {
-    ufw-docker--delete httpd-container-name "" tcp ""
+    ufw-docker--delete httpd-container-name "" tcp "" ""
 }
 
 
@@ -365,6 +374,16 @@ test-allow-internal-succeeds-when-port-matches() {
 }
 test-allow-internal-succeeds-when-port-matches-assert() {
     ufw-docker--add-rule instance-name 172.18.0.3 5000 tcp default
+}
+
+
+test-allow-internal-succeeds-when-port-and-source-match() {
+    setup-ufw-docker--allow
+
+    ufw-docker--allow instance-name 5000 tcp "" 203.0.113.10/32
+}
+test-allow-internal-succeeds-when-port-and-source-match-assert() {
+    ufw-docker--add-rule instance-name 172.18.0.3 5000 tcp default 203.0.113.10/32
 }
 
 
@@ -495,7 +514,7 @@ test-ipv6-allow-internal-succeeds-for-all-published-ports-on-selected-multinetwo
 
 
 test-add-rule-for-non-existing-rule() {
-    @mockfalse ufw-docker--list webapp 5000 tcp ""
+    @mockfalse ufw-docker--list webapp 5000 tcp "" "" exact
     @ignore echo
 
     load-ufw-docker-function ufw-docker--add-rule
@@ -506,7 +525,7 @@ test-add-rule-for-non-existing-rule-assert() {
 }
 
 test-add-rule-for-non-existing-rule-with-network() {
-    @mockfalse ufw-docker--list webapp 5000 tcp default
+    @mockfalse ufw-docker--list webapp 5000 tcp default "" exact
     @ignore echo
 
     load-ufw-docker-function ufw-docker--add-rule
@@ -517,8 +536,20 @@ test-add-rule-for-non-existing-rule-with-network-assert() {
 }
 
 
+test-add-rule-for-non-existing-rule-with-source() {
+    @mockfalse ufw-docker--list webapp 5000 tcp "" 203.0.113.10/32 exact
+    @ignore echo
+
+    load-ufw-docker-function ufw-docker--add-rule
+    ufw-docker--add-rule webapp 172.18.0.4 5000 tcp "" 203.0.113.10/32
+}
+test-add-rule-for-non-existing-rule-with-source-assert() {
+    ufw route allow proto tcp from 203.0.113.10/32 to 172.18.0.4 port 5000 comment "allow webapp 5000/tcp from 203.0.113.10/32"
+}
+
+
 test-add-rule-modifies-existing-rule() {
-    @mocktrue ufw-docker--list webapp 5000 tcp default
+    @mocktrue ufw-docker--list webapp 5000 tcp default "" exact
     @mock ufw --dry-run route allow proto tcp from any to 172.18.0.4 port 5000 comment "allow webapp 5000/tcp default" === @echo
     @mockfalse grep "^Skipping"
     @ignore echo
@@ -527,14 +558,14 @@ test-add-rule-modifies-existing-rule() {
     ufw-docker--add-rule webapp 172.18.0.4 5000 tcp default
 }
 test-add-rule-modifies-existing-rule-assert() {
-    ufw-docker--delete webapp 5000 tcp default
+    ufw-docker--delete webapp 5000 tcp default "" exact
 
     ufw route allow proto tcp from any to 172.18.0.4 port 5000 comment "allow webapp 5000/tcp default"
 }
 
 
 test-ipv6-add-rule-modifies-existing-rule() {
-    @mocktrue ufw-docker--list webapp/v6 5000 tcp default
+    @mocktrue ufw-docker--list webapp/v6 5000 tcp default "" exact
     @mock ufw --dry-run route allow proto tcp from any to fd00:cf::42 port 5000 comment "allow webapp/v6 5000/tcp default" === @echo
     @mockfalse grep "^Skipping"
     @ignore echo
@@ -543,14 +574,14 @@ test-ipv6-add-rule-modifies-existing-rule() {
     ufw-docker--add-rule webapp/v6 fd00:cf::42 5000 tcp default
 }
 test-ipv6-add-rule-modifies-existing-rule-assert() {
-    ufw-docker--delete webapp/v6 5000 tcp default
+    ufw-docker--delete webapp/v6 5000 tcp default "" exact
 
     ufw route allow proto tcp from any to fd00:cf::42 port 5000 comment "allow webapp/v6 5000/tcp default"
 }
 
 
 test-add-rule-skips-existing-rule() {
-    @mocktrue ufw-docker--list webapp 5000 tcp ""
+    @mocktrue ufw-docker--list webapp 5000 tcp "" "" exact
     @mocktrue ufw --dry-run route allow proto tcp from any to 172.18.0.4 port 5000 comment "allow webapp 5000/tcp"
     @mocktrue grep "^Skipping"
     @ignore echo
@@ -564,7 +595,7 @@ test-add-rule-skips-existing-rule-assert() {
 
 
 test-add-rule-modifies-existing-rule-without-port() {
-    @mocktrue ufw-docker--list webapp "" tcp ""
+    @mocktrue ufw-docker--list webapp "" "" "" "" exact
     @mock ufw --dry-run route allow proto tcp from any to 172.18.0.4 comment "allow webapp" === @echo
     @mockfalse grep "^Skipping"
     @ignore echo
@@ -574,7 +605,7 @@ test-add-rule-modifies-existing-rule-without-port() {
     ufw-docker--add-rule webapp 172.18.0.4 "" tcp ""
 }
 test-add-rule-modifies-existing-rule-without-port-assert() {
-    ufw-docker--delete webapp "" tcp ""
+    ufw-docker--delete webapp "" "" "" "" exact
 
     ufw route allow proto tcp from any to 172.18.0.4 comment "allow webapp"
 }
@@ -632,6 +663,17 @@ function mock-ufw-status-numbered-foo() {
 [15] fd00:a:b:deaf::3 53/tcp    ALLOW FWD   Anywhere (v6)              # allow foo/v6 53/tcp
 "
 
+}
+
+function mock-ufw-status-numbered-foo-with-from() {
+    @mock ufw status numbered === @echo "Status: active
+
+     To                         Action      From
+     --                         ------      ----
+[ 1] 172.17.0.3 80/tcp          ALLOW FWD   Anywhere                   # allow foo 80/tcp bridge
+[ 2] 172.17.0.3 80/tcp          ALLOW FWD   203.0.113.10/32            # allow foo 80/tcp bridge from 203.0.113.10/32
+[ 3] fd00:a:b:deaf::3 80/tcp    ALLOW FWD   2001:db8::10/128           # allow foo/v6 80/tcp bridge from 2001:db8::10/128
+"
 }
 
 test-status-internal() {
@@ -744,6 +786,30 @@ test-list-internal-rules-by-name-and-port() {
 test-list-internal-rules-by-name-and-port-assert() {
     @stdout "[ 3] 172.17.0.3 80/tcp          ALLOW FWD   Anywhere                   # allow foo 80/tcp bridge"
     @stdout "[12] fd00:a:b:deaf::3 80/tcp    ALLOW FWD   Anywhere (v6)              # allow foo/v6 80/tcp bridge"
+}
+
+
+test-list-internal-rules-by-name-port-network-and-source() {
+    mock-ufw-status-numbered-foo-with-from
+
+    load-ufw-docker-function ufw-docker--list
+    ufw-docker--list foo 80 tcp bridge 203.0.113.10/32
+}
+test-list-internal-rules-by-name-port-network-and-source-assert() {
+    @stdout "[ 2] 172.17.0.3 80/tcp          ALLOW FWD   203.0.113.10/32            # allow foo 80/tcp bridge from 203.0.113.10/32"
+}
+
+
+test-list-internal-rules-by-name-port-network-without-source-includes-source-rules() {
+    mock-ufw-status-numbered-foo-with-from
+
+    load-ufw-docker-function ufw-docker--list
+    ufw-docker--list foo 80 tcp bridge
+}
+test-list-internal-rules-by-name-port-network-without-source-includes-source-rules-assert() {
+    @stdout "[ 1] 172.17.0.3 80/tcp          ALLOW FWD   Anywhere                   # allow foo 80/tcp bridge"
+    @stdout "[ 2] 172.17.0.3 80/tcp          ALLOW FWD   203.0.113.10/32            # allow foo 80/tcp bridge from 203.0.113.10/32"
+    @stdout "[ 3] fd00:a:b:deaf::3 80/tcp    ALLOW FWD   2001:db8::10/128           # allow foo/v6 80/tcp bridge from 2001:db8::10/128"
 }
 
 

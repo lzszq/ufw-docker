@@ -384,6 +384,10 @@ Expose the `443` port of the container `httpd` and the protocol is `tcp` and the
 
     ufw-docker allow httpd 443/tcp foobar-external-network
 
+Expose the `443` port of the container `httpd` only to the source `203.0.113.10/32`
+
+    ufw-docker allow httpd 443/tcp --from 203.0.113.10/32
+
 Expose all published ports of the container `httpd`
 
     ufw-docker allow httpd
@@ -403,12 +407,15 @@ Expose the port `80` of the service `web`
     ufw-docker service allow web 80
     # or
     ufw-docker service allow web 80/tcp
+    # restrict to a specific source
+    ufw-docker service allow web 80/tcp --from 203.0.113.10/32
 
 Remove rules from all nodes related to the service `web`
 
     ufw-docker service delete allow web
 
     ufw-docker service delete allow web 80/tcp
+    ufw-docker service delete allow web 80/tcp --from 203.0.113.10/32
 
 ### Try it out
 
