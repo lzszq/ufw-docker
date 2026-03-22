@@ -223,7 +223,7 @@ test-list-command-for-instance() {
     ufw-docker list httpd
 }
 test-list-command-for-instance-assert() {
-    ufw-docker--list httpd-container-name "" tcp "" ""
+    ufw-docker--list httpd-container-name "" "" "" ""
 }
 
 
@@ -232,7 +232,7 @@ test-allow-command-for-instance() {
     ufw-docker allow httpd
 }
 test-allow-command-for-instance-assert() {
-    ufw-docker--allow httpd-container-name "" tcp "" ""
+    ufw-docker--allow httpd-container-name "" "" "" ""
 }
 
 
@@ -285,7 +285,7 @@ test-delete-allow-command-for-instance() {
     ufw-docker delete allow httpd
 }
 test-delete-allow-command-for-instance-assert() {
-    ufw-docker--delete httpd-container-name "" tcp "" ""
+    ufw-docker--delete httpd-container-name "" "" "" ""
 }
 
 
@@ -674,6 +674,14 @@ function mock-ufw-status-numbered-foo-with-from() {
 [ 2] 172.17.0.3 80/tcp          ALLOW FWD   203.0.113.10/32            # allow foo 80/tcp bridge from 203.0.113.10/32
 [ 3] fd00:a:b:deaf::3 80/tcp    ALLOW FWD   2001:db8::10/128           # allow foo/v6 80/tcp bridge from 2001:db8::10/128
 "
+}
+
+test-parse-rule-comment-accepts-regular-instance-name() {
+    load-ufw-docker-function ufw-docker--parse-rule-comment
+    ufw-docker--parse-rule-comment "foo 80/tcp bridge from 203.0.113.10/32"
+}
+test-parse-rule-comment-accepts-regular-instance-name-assert() {
+    @do-nothing
 }
 
 test-status-internal() {

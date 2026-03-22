@@ -7,6 +7,7 @@ LC_ALL=C
 PATH="/bin:/usr/bin:/sbin:/usr/sbin:/snap/bin/"
 
 GREP_REGEXP_NAME="[-_.[:alnum:]]\\+"
+BASH_REGEXP_NAME="[-_.[:alnum:]]+"
 DEFAULT_PROTO=tcp
 ENV_VALUE_SPLITTER=','
 
@@ -65,7 +66,7 @@ function ufw-docker--parse-rule-comment() {
     [[ "${#tokens[@]}" -gt 0 ]] || return 1
 
     RULE_COMMENT_INSTANCE_NAME="${tokens[0]}"
-    [[ "$RULE_COMMENT_INSTANCE_NAME" =~ ^${GREP_REGEXP_NAME}(/v6)?$ ]] || return 1
+    [[ "$RULE_COMMENT_INSTANCE_NAME" =~ ^${BASH_REGEXP_NAME}(/v6)?$ ]] || return 1
 
     if (( i < ${#tokens[@]} )) && [[ "${tokens[i]}" =~ ^[0-9]+/(tcp|udp)$ ]]; then
         RULE_COMMENT_PORT="${tokens[i]%/*}"
@@ -1301,12 +1302,15 @@ case "$ufw_action" in
             die "invalid port syntax: \"$INSTANCE_PORT\"."
         fi
 
-        PROTO="$DEFAULT_PROTO"
-        if [[ "$INSTANCE_PORT" = */udp ]]; then
-            PROTO=udp
-        fi
+        PROTO=""
+        if [[ -n "$INSTANCE_PORT" ]]; then
+            PROTO="$DEFAULT_PROTO"
+            if [[ "$INSTANCE_PORT" = */udp ]]; then
+                PROTO=udp
+            fi
 
-        INSTANCE_PORT="${INSTANCE_PORT%/*}"
+            INSTANCE_PORT="${INSTANCE_PORT%/*}"
+        fi
         ;;&
     delete|list)
         "ufw-docker--$ufw_action" "$INSTANCE_NAME" "$INSTANCE_PORT" "$PROTO" "$NETWORK" "$FROM_SOURCE"
